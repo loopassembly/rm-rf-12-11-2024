@@ -1,1038 +1,723 @@
-#array implementation of list----------------------
+
+-------------------------Dining Philosophers Problem using semaphores-------------------
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
 
-typedef struct {
-    int *array;
-    int size;
-    int capacity;
-} List;
+#define NUM_PHILOSOPHERS 5
 
-List* createList(int capacity) {
-    List *list = (List*)malloc(sizeof(List));
-    list->capacity = capacity;
-    list->size = 0;
-    list->array = (int*)malloc(capacity * sizeof(int));
-    return list;
-}
+sem_t forks[NUM_PHILOSOPHERS];
+pthread_t philosophers[NUM_PHILOSOPHERS];
 
-void resizeList(List *list) {
-    list->capacity *= 2;
-    list->array = (int*)realloc(list->array, list->capacity * sizeof(int));
-}
+void* philosopher(void* arg) {
+    int id = *(int*)arg;
+    int left = id;
+    int right = (id + 1) % NUM_PHILOSOPHERS;
 
-void add(List *list, int value) {
-    if (list->size == list->capacity) {
-        resizeList(list);
+    while (1) {
+        printf("Philosopher %d is thinking.\n", id);
+        sleep(1);
+
+        sem_wait(&forks[left]);
+        sem_wait(&forks[right]);
+
+        printf("Philosopher %d is eating.\n", id);
+        sleep(1);
+
+        sem_post(&forks[left]);
+        sem_post(&forks[right]);
     }
-    list->array[list->size++] = value;
-}
-
-int get(List *list, int index) {
-    if (index >= 0 && index < list->size) {
-        return list->array[index];
-    }
-    return -1;
-}
-
-void delete(List *list, int index) {
-    if (index >= 0 && index < list->size) {
-        for (int i = index; i < list->size - 1; i++) {
-            list->array[i] = list->array[i + 1];
-        }
-        list->size--;
-    }
-}
-
-void freeList(List *list) {
-    free(list->array);
-    free(list);
 }
 
 int main() {
-    List *list = createList(2);
-    int n, value;
+    int ids[NUM_PHILOSOPHERS];
 
-    printf("Enter the number of elements to add: ");
+    for (int i = 0; i < NUM_PHILOSOPHERS; i++)
+        sem_init(&forks[i], 0, 1);
+
+    for (int i = 0; i < NUM_PHILOSOPHERS; i++) {
+        ids[i] = i;
+        pthread_create(&philosophers[i], NULL, philosopher, &ids[i]);
+    }
+
+    for (int i = 0; i < NUM_PHILOSOPHERS; i++)
+        pthread_join(philosophers[i], NULL);
+
+    for (int i = 0; i < NUM_PHILOSOPHERS; i++)
+        sem_destroy(&forks[i]);
+
+    return 0;
+}
+
+
+----------------------------First-Come, First-Served (FCFS) Scheduling Algorithm
+#include <stdio.h>
+
+int main() {
+    int n, i;
+    int burst_time[20], wait_time[20], turn_around_time[20];
+    float avg_wait_time = 0, avg_turn_around_time = 0;
+
+    printf("Enter the number of processes: ");
     scanf("%d", &n);
-    
-    for (int i = 0; i < n; i++) {
-        printf("Enter element %d: ", i + 1);
-        scanf("%d", &value);
-        add(list, value);
+
+    for (i = 0; i < n; i++) {
+        printf("Enter burst time for process %d: ", i + 1);
+        scanf("%d", &burst_time[i]);
     }
 
-    printf("Elements in the list:\n");
-    for (int i = 0; i < list->size; i++) {
-        printf("%d ", get(list, i));
-    }
-    printf("\n");
+    wait_time[0] = 0;
 
-    printf("Enter the index to delete: ");
-    int index;
-    scanf("%d", &index);
-    delete(list, index);
+    for (i = 1; i < n; i++)
+        wait_time[i] = wait_time[i - 1] + burst_time[i - 1];
 
-    printf("Elements after deletion:\n");
-    for (int i = 0; i < list->size; i++) {
-        printf("%d ", get(list, i));
-    }
-    printf("\n");
-
-    freeList(list);
-    return 0;
-}
+    for (i = 0; i < n; i++)
+        turn_around_time[i] = burst_time[i] + wait_time[i];
 
 
-#implementation of linklist------------------
+
+-------------------Shortest Job First (SJF) Scheduling Algorithm------------
+
+
 #include <stdio.h>
-#include <stdlib.h>
-
-typedef struct Node {
-    int data;
-    struct Node* next;
-} Node;
-
-typedef struct LinkedList {
-    Node* head;
-} LinkedList;
-
-LinkedList* createList() {
-    LinkedList* list = (LinkedList*)malloc(sizeof(LinkedList));
-    list->head = NULL;
-    return list;
-}
-
-void add(LinkedList* list, int value) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
-    newNode->data = value;
-    newNode->next = list->head;
-    list->head = newNode;
-}
-
-void display(LinkedList* list) {
-    Node* current = list->head;
-    while (current != NULL) {
-        printf("%d ", current->data);
-        current = current->next;
-    }
-    printf("\n");
-}
-
-void deleteNode(LinkedList* list, int index) {
-    if (list->head == NULL) return;
-    Node* current = list->head;
-    if (index == 0) {
-        list->head = current->next;
-        free(current);
-        return;
-    }
-    for (int i = 0; current != NULL && i < index - 1; i++) {
-        current = current->next;
-    }
-    if (current == NULL || current->next == NULL) return;
-    Node* nextNode = current->next->next;
-    free(current->next);
-    current->next = nextNode;
-}
-
-void freeList(LinkedList* list) {
-    Node* current = list->head;
-    while (current != NULL) {
-        Node* next = current->next;
-        free(current);
-        current = next;
-    }
-    free(list);
-}
 
 int main() {
-    LinkedList* list = createList();
-    int n, value;
+    int n, burst_time[20], wait_time[20], turn_around_time[20];
+    int i, j, pos, temp;
+    float avg_wait_time = 0, avg_turn_around_time = 0;
 
-    printf("Enter the number of elements to add: ");
+    printf("Enter the number of processes: ");
     scanf("%d", &n);
-    
-    for (int i = 0; i < n; i++) {
-        printf("Enter element %d: ", i + 1);
-        scanf("%d", &value);
-        add(list, value);
+
+    for (i = 0; i < n; i++) {
+        printf("Enter burst time for process %d: ", i + 1);
+        scanf("%d", &burst_time[i]);
     }
 
-    printf("Elements in the list: ");
-    display(list);
+    for (i = 0; i < n; i++) {
+        pos = i;
+        for (j = i + 1; j < n; j++) {
+            if (burst_time[j] < burst_time[pos])
+                pos = j;
+        }
+        temp = burst_time[i];
+        burst_time[i] = burst_time[pos];
+        burst_time[pos] = temp;
+    }
 
-    printf("Enter the index to delete: ");
-    int index;
-    scanf("%d", &index);
-    deleteNode(list, index);
+    wait_time[0] = 0;
 
-    printf("Elements after deletion: ");
-    display(list);
+    for (i = 1; i < n; i++)
+        wait_time[i] = wait_time[i - 1] + burst_time[i - 1];
 
-    freeList(list);
+    for (i = 0; i < n; i++)
+        turn_around_time[i] = burst_time[i] + wait_time[i];
+
+    for (i = 0; i < n; i++) {
+        avg_wait_time += wait_time[i];
+        avg_turn_around_time += turn_around_time[i];
+    }
+
+    avg_wait_time /= n;
+    avg_turn_around_time /= n;
+
+    printf("\nProcess\tBurst Time\tWaiting Time\tTurnaround Time\n");
+    for (i = 0; i < n; i++)
+        printf("%d\t%d\t\t%d\t\t%d\n", i + 1, burst_time[i], wait_time[i], turn_around_time[i]);
+
+    printf("\nAverage Waiting Time: %.2f", avg_wait_time);
+    printf("\nAverage Turnaround Time: %.2f\n", avg_turn_around_time);
+
     return 0;
 }
 
 
-#implementation od doubly linklist ------------
+
+-----------------------simulate the CPU scheduling priority algorithm-------------
 
 #include <stdio.h>
-#include <stdlib.h>
-
-typedef struct Node {
-    int data;
-    struct Node* next;
-    struct Node* prev;
-} Node;
-
-typedef struct DoublyLinkedList {
-    Node* head;
-} DoublyLinkedList;
-
-DoublyLinkedList* createList() {
-    DoublyLinkedList* list = (DoublyLinkedList*)malloc(sizeof(DoublyLinkedList));
-    list->head = NULL;
-    return list;
-}
-
-void add(DoublyLinkedList* list, int value) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
-    newNode->data = value;
-    newNode->next = list->head;
-    newNode->prev = NULL;
-    if (list->head != NULL) {
-        list->head->prev = newNode;
-    }
-    list->head = newNode;
-}
-
-void display(DoublyLinkedList* list) {
-    Node* current = list->head;
-    while (current != NULL) {
-        printf("%d ", current->data);
-        current = current->next;
-    }
-    printf("\n");
-}
-
-void deleteNode(DoublyLinkedList* list, int index) {
-    if (list->head == NULL) return;
-    Node* current = list->head;
-    if (index == 0) {
-        list->head = current->next;
-        if (list->head != NULL) {
-            list->head->prev = NULL;
-        }
-        free(current);
-        return;
-    }
-    for (int i = 0; current != NULL && i < index; i++) {
-        current = current->next;
-    }
-    if (current == NULL) return;
-    if (current->next != NULL) {
-        current->next->prev = current->prev;
-    }
-    if (current->prev != NULL) {
-        current->prev->next = current->next;
-    }
-    free(current);
-}
-
-void freeList(DoublyLinkedList* list) {
-    Node* current = list->head;
-    while (current != NULL) {
-        Node* next = current->next;
-        free(current);
-        current = next;
-    }
-    free(list);
-}
 
 int main() {
-    DoublyLinkedList* list = createList();
-    int n, value;
+    int n, i, j, pos, temp;
+    int burst_time[20], priority[20], wait_time[20], turn_around_time[20], process[20];
+    float avg_wait_time = 0, avg_turn_around_time = 0;
 
-    printf("Enter the number of elements to add: ");
+    printf("Enter the number of processes: ");
     scanf("%d", &n);
-    
-    for (int i = 0; i < n; i++) {
-        printf("Enter element %d: ", i + 1);
-        scanf("%d", &value);
-        add(list, value);
+
+    for (i = 0; i < n; i++) {
+        printf("Enter burst time and priority for process %d: ", i + 1);
+        scanf("%d %d", &burst_time[i], &priority[i]);
+        process[i] = i + 1;
     }
 
-    printf("Elements in the list: ");
-    display(list);
+    for (i = 0; i < n; i++) {
+        pos = i;
+        for (j = i + 1; j < n; j++) {
+            if (priority[j] < priority[pos])
+                pos = j;
+        }
 
-    printf("Enter the index to delete: ");
-    int index;
-    scanf("%d", &index);
-    deleteNode(list, index);
+        temp = priority[i];
+        priority[i] = priority[pos];
+        priority[pos] = temp;
 
-    printf("Elements after deletion: ");
-    display(list);
+        temp = burst_time[i];
+        burst_time[i] = burst_time[pos];
+        burst_time[pos] = temp;
 
-    freeList(list);
+        temp = process[i];
+        process[i] = process[pos];
+        process[pos] = temp;
+    }
+
+    wait_time[0] = 0;
+
+    for (i = 1; i < n; i++)
+        wait_time[i] = wait_time[i - 1] + burst_time[i - 1];
+
+    for (i = 0; i < n; i++)
+        turn_around_time[i] = burst_time[i] + wait_time[i];
+
+    for (i = 0; i < n; i++) {
+        avg_wait_time += wait_time[i];
+        avg_turn_around_time += turn_around_time[i];
+    }
+
+    avg_wait_time /= n;
+    avg_turn_around_time /= n;
+
+    printf("\nProcess\tBurst Time\tPriority\tWaiting Time\tTurnaround Time\n");
+    for (i = 0; i < n; i++)
+        printf("%d\t%d\t\t%d\t\t%d\t\t%d\n", process[i], burst_time[i], priority[i], wait_time[i], turn_around_time[i]);
+
+    printf("\nAverage Waiting Time: %.2f", avg_wait_time);
+    printf("\nAverage Turnaround Time: %.2f\n", avg_turn_around_time);
+
     return 0;
 }
 
 
-
-#implementation os stack using array
-
-#include <stdio.h>
-#include <stdlib.h>
-
-#define MAX 100
-
-typedef struct Stack {
-    int top;
-    int items[MAX];
-} Stack;
-
-Stack* createStack() {
-    Stack* stack = (Stack*)malloc(sizeof(Stack));
-    stack->top = -1;
-    return stack;
-}
-
-int isFull(Stack* stack) {
-    return stack->top == MAX - 1;
-}
-
-int isEmpty(Stack* stack) {
-    return stack->top == -1;
-}
-
-void push(Stack* stack, int value) {
-    if (!isFull(stack)) {
-        stack->items[++stack->top] = value;
-    } else {
-        printf("Stack Overflow\n");
-    }
-}
-
-int pop(Stack* stack) {
-    if (!isEmpty(stack)) {
-        return stack->items[stack->top--];
-    } else {
-        printf("Stack Underflow\n");
-        return -1;
-    }
-}
-
-void display(Stack* stack) {
-    if (isEmpty(stack)) {
-        printf("Stack is empty\n");
-        return;
-    }
-    for (int i = stack->top; i >= 0; i--) {
-        printf("%d\n", stack->items[i]);
-    }
-}
-
-void freeStack(Stack* stack) {
-    free(stack);
-}
-
-int main() {
-    Stack* stack = createStack();
-    int choice, value;
-
-    while (1) {
-        printf("1. Push\n2. Pop\n3. Display\n4. Exit\n");
-        printf("Enter your choice: ");
-        scanf("%d", &choice);
-
-        switch (choice) {
-            case 1:
-                printf("Enter value to push: ");
-                scanf("%d", &value);
-                push(stack, value);
-                break;
-            case 2:
-                value = pop(stack);
-                if (value != -1) {
-                    printf("Popped value: %d\n", value);
-                }
-                break;
-            case 3:
-                printf("Stack elements:\n");
-                display(stack);
-                break;
-            case 4:
-                freeStack(stack);
-                return 0;
-            default:
-                printf("Invalid choice\n");
-        }
-    }
-}
-
-
-#implementation os stack using linklist
+----------------------To simulate Bankers algorithm----------------
 
 #include <stdio.h>
-#include <stdlib.h>
-
-typedef struct Node {
-    int data;
-    struct Node* next;
-} Node;
-
-typedef struct Stack {
-    Node* top;
-} Stack;
-
-Stack* createStack() {
-    Stack* stack = (Stack*)malloc(sizeof(Stack));
-    stack->top = NULL;
-    return stack;
-}
-
-int isEmpty(Stack* stack) {
-    return stack->top == NULL;
-}
-
-void push(Stack* stack, int value) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
-    newNode->data = value;
-    newNode->next = stack->top;
-    stack->top = newNode;
-}
-
-int pop(Stack* stack) {
-    if (isEmpty(stack)) {
-        printf("Stack Underflow\n");
-        return -1;
-    }
-    Node* temp = stack->top;
-    int poppedValue = temp->data;
-    stack->top = stack->top->next;
-    free(temp);
-    return poppedValue;
-}
-
-void display(Stack* stack) {
-    if (isEmpty(stack)) {
-        printf("Stack is empty\n");
-        return;
-    }
-    Node* current = stack->top;
-    while (current != NULL) {
-        printf("%d\n", current->data);
-        current = current->next;
-    }
-}
-
-void freeStack(Stack* stack) {
-    while (!isEmpty(stack)) {
-        pop(stack);
-    }
-    free(stack);
-}
 
 int main() {
-    Stack* stack = createStack();
-    int choice, value;
+    int n, m, i, j, k;
+    int allocation[10][10], max[10][10], available[10];
+    int need[10][10], finish[10], safe_sequence[10];
+    int count = 0;
 
-    while (1) {
-        printf("1. Push\n2. Pop\n3. Display\n4. Exit\n");
-        printf("Enter your choice: ");
-        scanf("%d", &choice);
-
-        switch (choice) {
-            case 1:
-                printf("Enter value to push: ");
-                scanf("%d", &value);
-                push(stack, value);
-                break;
-            case 2:
-                value = pop(stack);
-                if (value != -1) {
-                    printf("Popped value: %d\n", value);
-                }
-                break;
-            case 3:
-                printf("Stack elements:\n");
-                display(stack);
-                break;
-            case 4:
-                freeStack(stack);
-                return 0;
-            default:
-                printf("Invalid choice\n");
-        }
-    }
-}
-
-
-#implemention of queuq using array
-
-#include <stdio.h>
-#include <stdlib.h>
-
-#define MAX 100
-
-typedef struct Queue {
-    int front;
-    int rear;
-    int items[MAX];
-} Queue;
-
-Queue* createQueue() {
-    Queue* queue = (Queue*)malloc(sizeof(Queue));
-    queue->front = -1;
-    queue->rear = -1;
-    return queue;
-}
-
-int isFull(Queue* queue) {
-    return (queue->rear + 1) % MAX == queue->front;
-}
-
-int isEmpty(Queue* queue) {
-    return queue->front == -1;
-}
-
-void enqueue(Queue* queue, int value) {
-    if (!isFull(queue)) {
-        if (queue->front == -1) {
-            queue->front = 0;
-        }
-        queue->rear = (queue->rear + 1) % MAX;
-        queue->items[queue->rear] = value;
-    } else {
-        printf("Queue Overflow\n");
-    }
-}
-
-int dequeue(Queue* queue) {
-    if (!isEmpty(queue)) {
-        int value = queue->items[queue->front];
-        if (queue->front == queue->rear) {
-            queue->front = queue->rear = -1;
-        } else {
-            queue->front = (queue->front + 1) % MAX;
-        }
-        return value;
-    } else {
-        printf("Queue Underflow\n");
-        return -1;
-    }
-}
-
-void display(Queue* queue) {
-    if (isEmpty(queue)) {
-        printf("Queue is empty\n");
-        return;
-    }
-    int i = queue->front;
-    while (1) {
-        printf("%d ", queue->items[i]);
-        if (i == queue->rear) break;
-        i = (i + 1) % MAX;
-    }
-    printf("\n");
-}
-
-void freeQueue(Queue* queue) {
-    free(queue);
-}
-
-int main() {
-    Queue* queue = createQueue();
-    int choice, value;
-
-    while (1) {
-        printf("1. Enqueue\n2. Dequeue\n3. Display\n4. Exit\n");
-        printf("Enter your choice: ");
-        scanf("%d", &choice);
-
-        switch (choice) {
-            case 1:
-                printf("Enter value to enqueue: ");
-                scanf("%d", &value);
-                enqueue(queue, value);
-                break;
-            case 2:
-                value = dequeue(queue);
-                if (value != -1) {
-                    printf("Dequeued value: %d\n", value);
-                }
-                break;
-            case 3:
-                printf("Queue elements: ");
-                display(queue);
-                break;
-            case 4:
-                freeQueue(queue);
-                return 0;
-            default:
-                printf("Invalid choice\n");
-        }
-    }
-}
-
-
-#implementation os queue using linklist
-#include <stdio.h>
-#include <stdlib.h>
-
-typedef struct Node {
-    int data;
-    struct Node* next;
-} Node;
-
-typedef struct Queue {
-    Node* front;
-    Node* rear;
-} Queue;
-
-Queue* createQueue() {
-    Queue* queue = (Queue*)malloc(sizeof(Queue));
-    queue->front = NULL;
-    queue->rear = NULL;
-    return queue;
-}
-
-int isEmpty(Queue* queue) {
-    return queue->front == NULL;
-}
-
-void enqueue(Queue* queue, int value) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
-    newNode->data = value;
-    newNode->next = NULL;
-    if (queue->rear != NULL) {
-        queue->rear->next = newNode;
-    }
-    queue->rear = newNode;
-    if (queue->front == NULL) {
-        queue->front = newNode;
-    }
-}
-
-int dequeue(Queue* queue) {
-    if (isEmpty(queue)) {
-        printf("Queue Underflow\n");
-        return -1;
-    }
-    Node* temp = queue->front;
-    int value = temp->data;
-    queue->front = queue->front->next;
-    if (queue->front == NULL) {
-        queue->rear = NULL;
-    }
-    free(temp);
-    return value;
-}
-
-void display(Queue* queue) {
-    if (isEmpty(queue)) {
-        printf("Queue is empty\n");
-        return;
-    }
-    Node* current = queue->front;
-    while (current != NULL) {
-        printf("%d ", current->data);
-        current = current->next;
-    }
-    printf("\n");
-}
-
-void freeQueue(Queue* queue) {
-    while (!isEmpty(queue)) {
-        dequeue(queue);
-    }
-    free(queue);
-}
-
-int main() {
-    Queue* queue = createQueue();
-    int choice, value;
-
-    while (1) {
-        printf("1. Enqueue\n2. Dequeue\n3. Display\n4. Exit\n");
-        printf("Enter your choice: ");
-        scanf("%d", &choice);
-
-        switch (choice) {
-            case 1:
-                printf("Enter value to enqueue: ");
-                scanf("%d", &value);
-                enqueue(queue, value);
-                break;
-            case 2:
-                value = dequeue(queue);
-                if (value != -1) {
-                    printf("Dequeued value: %d\n", value);
-                }
-                break;
-            case 3:
-                printf("Queue elements: ");
-                display(queue);
-                break;
-            case 4:
-                freeQueue(queue);
-                return 0;
-            default:
-                printf("Invalid choice\n");
-        }
-    }
-}
-
-
-#implementation os tower of hanoi using stack queue
-#include <stdio.h>
-#include <stdlib.h>
-
-typedef struct Node {
-    int data;
-    struct Node* next;
-} Node;
-
-typedef struct Stack {
-    Node* top;
-} Stack;
-
-Stack* createStack() {
-    Stack* stack = (Stack*)malloc(sizeof(Stack));
-    stack->top = NULL;
-    return stack;
-}
-
-int isEmpty(Stack* stack) {
-    return stack->top == NULL;
-}
-
-void push(Stack* stack, int value) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
-    newNode->data = value;
-    newNode->next = stack->top;
-    stack->top = newNode;
-}
-
-int pop(Stack* stack) {
-    if (isEmpty(stack)) {
-        return -1;
-    }
-    Node* temp = stack->top;
-    int poppedValue = temp->data;
-    stack->top = stack->top->next;
-    free(temp);
-    return poppedValue;
-}
-
-void moveDisk(Stack* source, Stack* destination, char s, char d) {
-    int disk = pop(source);
-    push(destination, disk);
-    printf("Move disk %d from %c to %c\n", disk, s, d);
-}
-
-void hanoi(int n, Stack* source, Stack* destination, Stack* auxiliary, char s, char d, char a) {
-    if (n == 1) {
-        moveDisk(source, destination, s, d);
-        return;
-    }
-    hanoi(n - 1, source, auxiliary, destination, s, a, d);
-    moveDisk(source, destination, s, d);
-    hanoi(n - 1, auxiliary, destination, source, a, d, s);
-}
-
-int main() {
-    int n;
-    printf("Enter the number of disks: ");
+    printf("Enter the number of processes: ");
     scanf("%d", &n);
-    
-    Stack* source = createStack();
-    Stack* destination = createStack();
-    Stack* auxiliary = createStack();
 
-    for (int i = n; i >= 1; i--) {
-        push(source, i);
-    }
+    printf("Enter the number of resources: ");
+    scanf("%d", &m);
 
-    hanoi(n, source, destination, auxiliary, 'A', 'C', 'B');
+    printf("Enter the allocation matrix:\n");
+    for (i = 0; i < n; i++)
+        for (j = 0; j < m; j++)
+            scanf("%d", &allocation[i][j]);
 
-    free(source);
-    free(destination);
-    free(auxiliary);
-    return 0;
-}
+    printf("Enter the maximum matrix:\n");
+    for (i = 0; i < n; i++)
+        for (j = 0; j < m; j++)
+            scanf("%d", &max[i][j]);
 
+    printf("Enter the available resources:\n");
+    for (i = 0; i < m; i++)
+        scanf("%d", &available[i]);
 
-#conversion of infix to postfix using stack and queue
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
+    for (i = 0; i < n; i++)
+        for (j = 0; j < m; j++)
+            need[i][j] = max[i][j] - allocation[i][j];
 
-typedef struct Node {
-    char data;
-    struct Node* next;
-} Node;
+    for (i = 0; i < n; i++)
+        finish[i] = 0;
 
-typedef struct Stack {
-    Node* top;
-} Stack;
+    for (k = 0; k < n; k++) {
+        for (i = 0; i < n; i++) {
+            if (finish[i] == 0) {
+                int flag = 1;
+                for (j = 0; j < m; j++) {
+                    if (need[i][j] > available[j]) {
+                        flag = 0;
+                        break;
+                    }
+                }
 
-typedef struct Queue {
-    Node* front;
-    Node* rear;
-} Queue;
-
-Stack* createStack() {
-    Stack* stack = (Stack*)malloc(sizeof(Stack));
-    stack->top = NULL;
-    return stack;
-}
-
-Queue* createQueue() {
-    Queue* queue = (Queue*)malloc(sizeof(Queue));
-    queue->front = NULL;
-    queue->rear = NULL;
-    return queue;
-}
-
-int isEmptyStack(Stack* stack) {
-    return stack->top == NULL;
-}
-
-int isEmptyQueue(Queue* queue) {
-    return queue->front == NULL;
-}
-
-void push(Stack* stack, char value) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
-    newNode->data = value;
-    newNode->next = stack->top;
-    stack->top = newNode;
-}
-
-char pop(Stack* stack) {
-    if (isEmptyStack(stack)) return '\0';
-    Node* temp = stack->top;
-    char poppedValue = temp->data;
-    stack->top = stack->top->next;
-    free(temp);
-    return poppedValue;
-}
-
-char peek(Stack* stack) {
-    return stack->top->data;
-}
-
-void enqueue(Queue* queue, char value) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
-    newNode->data = value;
-    newNode->next = NULL;
-    if (isEmptyQueue(queue)) {
-        queue->front = queue->rear = newNode;
-    } else {
-        queue->rear->next = newNode;
-        queue->rear = newNode;
-    }
-}
-
-void dequeue(Queue* queue, char* value) {
-    if (isEmptyQueue(queue)) return;
-    Node* temp = queue->front;
-    *value = temp->data;
-    queue->front = queue->front->next;
-    if (queue->front == NULL) {
-        queue->rear = NULL;
-    }
-    free(temp);
-}
-
-int precedence(char op) {
-    if (op == '+' || op == '-') return 1;
-    if (op == '*' || op == '/') return 2;
-    return 0;
-}
-
-void infixToPostfix(char* infix, Queue* queue) {
-    Stack* stack = createStack();
-    for (int i = 0; i < strlen(infix); i++) {
-        if (isalnum(infix[i])) {
-            enqueue(queue, infix[i]);
-        } else if (infix[i] == '(') {
-            push(stack, infix[i]);
-        } else if (infix[i] == ')') {
-            while (!isEmptyStack(stack) && peek(stack) != '(') {
-                enqueue(queue, pop(stack));
+                if (flag) {
+                    for (j = 0; j < m; j++)
+                        available[j] += allocation[i][j];
+                    safe_sequence[count++] = i;
+                    finish[i] = 1;
+                }
             }
-            pop(stack);
-        } else {
-            while (!isEmptyStack(stack) && precedence(peek(stack)) >= precedence(infix[i])) {
-                enqueue(queue, pop(stack));
-            }
-            push(stack, infix[i]);
         }
     }
-    while (!isEmptyStack(stack)) {
-        enqueue(queue, pop(stack));
+
+    int safe = 1;
+    for (i = 0; i < n; i++) {
+        if (finish[i] == 0) {
+            safe = 0;
+            break;
+        }
     }
-    free(stack);
+
+    if (safe) {
+        printf("System is in a safe state.\nSafe sequence is: ");
+        for (i = 0; i < n; i++)
+         
+
+
+------------------To simulating contiguous memory allocation techniques: First Fit, Best Fit, and Worst Fit.
+
+#include <stdio.h>
+
+void firstFit(int blockSize[], int m, int processSize[], int n) {
+    int allocation[n];
+    for (int i = 0; i < n; i++)
+        allocation[i] = -1;
+
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            if (blockSize[j] >= processSize[i]) {
+                allocation[i] = j;
+                blockSize[j] -= processSize[i];
+                break;
+            }
+        }
+    }
+
+    printf("\nFirst Fit Allocation\nProcess No.\tProcess Size\tBlock No.\n");
+    for (int i = 0; i < n; i++) {
+        printf("%d\t\t%d\t\t", i + 1, processSize[i]);
+        if (allocation[i] != -1)
+            printf("%d\n", allocation[i] + 1);
+        else
+            printf("Not Allocated\n");
+    }
 }
 
-void displayQueue(Queue* queue) {
-    Node* current = queue->front;
-    while (current != NULL) {
-        printf("%c", current->data);
-        current = current->next;
+void bestFit(int blockSize[], int m, int processSize[], int n) {
+    int allocation[n];
+    for (int i = 0; i < n; i++)
+        allocation[i] = -1;
+
+    for (int i = 0; i < n; i++) {
+        int bestIdx = -1;
+        for (int j = 0; j < m; j++) {
+            if (blockSize[j] >= processSize[i]) {
+                if (bestIdx == -1 || blockSize[j] < blockSize[bestIdx])
+                    bestIdx = j;
+            }
+        }
+
+        if (bestIdx != -1) {
+            allocation[i] = bestIdx;
+            blockSize[bestIdx] -= processSize[i];
+        }
     }
-    printf("\n");
+
+    printf("\nBest Fit Allocation\nProcess No.\tProcess Size\tBlock No.\n");
+    for (int i = 0; i < n; i++) {
+        printf("%d\t\t%d\t\t", i + 1, processSize[i]);
+        if (allocation[i] != -1)
+            printf("%d\n", allocation[i] + 1);
+        else
+            printf("Not Allocated\n");
+    }
+}
+
+void worstFit(int blockSize[], int m, int processSize[], int n) {
+    int allocation[n];
+    for (int i = 0; i < n; i++)
+        allocation[i] = -1;
+
+    for (int i = 0; i < n; i++) {
+        int worstIdx = -1;
+        for (int j = 0; j < m; j++) {
+            if (blockSize[j] >= processSize[i]) {
+                if (worstIdx == -1 || blockSize[j] > blockSize[worstIdx])
+                    worstIdx = j;
+            }
+        }
+
+        if (worstIdx != -1) {
+            allocation[i] = worstIdx;
+            blockSize[worstIdx] -= processSize[i];
+        }
+    }
+
+    printf("\nWorst Fit Allocation\nProcess No.\tProcess Size\tBlock No.\n");
+    for (int i = 0; i < n; i++) {
+        printf("%d\t\t%d\t\t", i + 1, processSize[i]);
+        if (allocation[i] != -1)
+            printf("%d\n", allocation[i] + 1);
+        else
+            printf("Not Allocated\n");
+    }
 }
 
 int main() {
-    char infix[] = "A+B*C-(D/E^F)*G"; // Hardcoded infix expression
-    Queue* queue = createQueue();
-    infixToPostfix(infix, queue);
-    printf("Postfix expression: ");
-    displayQueue(queue);
-    free(queue);
+    int blockSize[] = {100, 500, 200, 300, 600};
+    int processSize[] = {212, 417, 112, 426};
+    int m = sizeof(blockSize) / sizeof(blockSize[0]);
+    int n = sizeof(processSize) / sizeof(processSize[0]);
+
+    int blockSize1[m], blockSize2[m], blockSize3[m];
+    for (int i = 0; i < m; i++) {
+        blockSize1[i] = blockSize[i];
+        blockSize2[i] = blockSize[i];
+        blockSize3[i] = blockSize[i];
+    }
+
+    firstFit(blockSize1, m, processSize, n);
+    bestFit(blockSize2, m, processSize, n);
+    worstFit(blockSize3, m, processSize, n);
+
     return 0;
 }
 
 
-#implemention of process shedulling in stack and queue
+--------------------Write a program to simulate FIFO, LRU and LFU page replacement techniques
+algorithm
+
+#include <stdio.h>
+
+void fifo(int pages[], int n, int frames) {
+    int frame[frames], page_faults = 0, pointer = 0;
+    for (int i = 0; i < frames; i++) frame[i] = -1;
+
+    for (int i = 0; i < n; i++) {
+        int flag = 0;
+        for (int j = 0; j < frames; j++) {
+            if (frame[j] == pages[i]) {
+                flag = 1;
+                break;
+            }
+        }
+        if (!flag) {
+            frame[pointer] = pages[i];
+            pointer = (pointer + 1) % frames;
+            page_faults++;
+        }
+    }
+
+    printf("\nFIFO Page Replacement\nTotal page faults: %d\n", page_faults);
+}
+
+void lru(int pages[], int n, int frames) {
+    int frame[frames], page_faults = 0, last_used[n];
+    for (int i = 0; i < frames; i++) frame[i] = -1;
+
+    for (int i = 0; i < n; i++) {
+        int flag = 0, min = n + 1, pos = -1;
+        for (int j = 0; j < frames; j++) {
+            if (frame[j] == pages[i]) {
+                flag = 1;
+                break;
+            }
+        }
+        if (!flag) {
+            for (int j = 0; j < frames; j++) {
+                if (frame[j] == -1) {
+                    frame[j] = pages[i];
+                    page_faults++;
+                    break;
+                }
+                for (int k = 0; k < i; k++) {
+                    if (frame[j] == pages[k]) {
+                        last_used[j] = k;
+                        break;
+                    }
+                }
+                if (last_used[j] < min) {
+                    min = last_used[j];
+                    pos = j;
+                }
+            }
+            frame[pos] = pages[i];
+            page_faults++;
+        }
+    }
+
+    printf("\nLRU Page Replacement\nTotal page faults: %d\n", page_faults);
+}
+
+void lfu(int pages[], int n, int frames) {
+    int frame[frames], freq[frames], page_faults = 0;
+    for (int i = 0; i < frames; i++) {
+        frame[i] = -1;
+        freq[i] = 0;
+    }
+
+    for (int i = 0; i < n; i++) {
+        int flag = 0, min_freq = n + 1, pos = -1;
+        for (int j = 0; j < frames; j++) {
+            if (frame[j] == pages[i]) {
+                flag = 1;
+                freq[j]++;
+                break;
+            }
+        }
+        if (!flag) {
+            for (int j = 0; j < frames; j++) {
+                if (frame[j] == -1) {
+                    frame[j] = pages[i];
+                    freq[j] = 1;
+                    page_faults++;
+                    break;
+                }
+                if (freq[j] < min_freq) {
+                    min_freq = freq[j];
+                    pos = j;
+                }
+            }
+            frame[pos] = pages[i];
+            freq[pos] = 1;
+            page_faults++;
+        }
+    }
+
+    printf("\nLFU Page Replacement\nTotal page faults: %d\n", page_faults);
+}
+
+int main() {
+    int pages[] = {7, 0, 1, 2, 0, 3, 0, 4, 2, 3, 0, 3, 2, 4};
+    int n = sizeof(pages) / sizeof(pages[0]);
+    int frames = 3;
+
+    fifo(pages, n, frames);
+    lru(pages, n, frames);
+    lfu(pages, n, frames);
+
+    return 0;
+}
+
+
+
+-------------To simulate disk scheduling algorithms FCFS-SCAN and C-SCAN-----------
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
-typedef struct Process {
-    int id;
-    int burstTime;
-    int waitingTime;
-} Process;
+void fcfs(int arr[], int n, int head) {
+    int seek_count = 0;
+    int distance, cur_head;
 
-typedef struct Node {
-    Process process;
-    struct Node* next;
-} Node;
-
-typedef struct Queue {
-    Node* front;
-    Node* rear;
-} Queue;
-
-typedef struct Stack {
-    Node* top;
-} Stack;
-
-Queue* createQueue() {
-    Queue* queue = (Queue*)malloc(sizeof(Queue));
-    queue->front = NULL;
-    queue->rear = NULL;
-    return queue;
+    cur_head = head;
+    for (int i = 0; i < n; i++) {
+        distance = abs(arr[i] - cur_head);
+        seek_count += distance;
+        cur_head = arr[i];
+    }
+    printf("\nFCFS Disk Scheduling\nTotal seek operations = %d\n", seek_count);
 }
 
-Stack* createStack() {
-    Stack* stack = (Stack*)malloc(sizeof(Stack));
-    stack->top = NULL;
-    return stack;
-}
+void scan(int arr[], int n, int head, int direction) {
+    int seek_count = 0;
+    int distance, cur_head;
+    int left = 0, right = 0;
 
-int isEmptyQueue(Queue* queue) {
-    return queue->front == NULL;
-}
+    int temp[n];
+    for (int i = 0; i < n; i++) {
+        temp[i] = arr[i];
+    }
 
-int isEmptyStack(Stack* stack) {
-    return stack->top == NULL;
-}
+    for (int i = 0; i < n; i++) {
+        if (temp[i] < head) left++;
+        if (temp[i] > head) right++;
+    }
 
-void enqueue(Queue* queue, Process process) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
-    newNode->process = process;
-    newNode->next = NULL;
-    if (isEmptyQueue(queue)) {
-        queue->front = queue->rear = newNode;
+    qsort(temp, n, sizeof(int), (int (*)(const void *, const void *))strcmp);
+
+    if (direction == 0) {
+        for (int i = left - 1; i >= 0; i--) {
+            distance = abs(temp[i] - cur_head);
+            seek_count += distance;
+            cur_head = temp[i];
+        }
+        seek_count += abs(head - 0);
+        cur_head = 0;
+        for (int i = left; i < n; i++) {
+            distance = abs(temp[i] - cur_head);
+            seek_count += distance;
+            cur_head = temp[i];
+        }
     } else {
-        queue->rear->next = newNode;
-        queue->rear = newNode;
+        for (int i = left; i < n; i++) {
+            distance = abs(temp[i] - cur_head);
+            seek_count += distance;
+            cur_head = temp[i];
+        }
+        seek_count += abs(head - 100);
+        cur_head = 100;
+        for (int i = left - 1; i >= 0; i--) {
+            distance = abs(temp[i] - cur_head);
+            seek_count += distance;
+            cur_head = temp[i];
+        }
     }
+
+    printf("\nSCAN Disk Scheduling\nTotal seek operations = %d\n", seek_count);
 }
 
-Process dequeue(Queue* queue) {
-    Process process = {0, 0, 0};
-    if (isEmptyQueue(queue)) return process;
-    Node* temp = queue->front;
-    process = temp->process;
-    queue->front = queue->front->next;
-    if (queue->front == NULL) {
-        queue->rear = NULL;
+void cscan(int arr[], int n, int head, int direction) {
+    int seek_count = 0;
+    int distance, cur_head;
+    int left = 0, right = 0;
+
+    int temp[n];
+    for (int i = 0; i < n; i++) {
+        temp[i] = arr[i];
     }
-    free(temp);
-    return process;
-}
 
-void push(Stack* stack, Process process) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
-    newNode->process = process;
-    newNode->next = stack->top;
-    stack->top = newNode;
-}
-
-Process pop(Stack* stack) {
-    Process process = {0, 0, 0};
-    if (isEmptyStack(stack)) return process;
-    Node* temp = stack->top;
-    process = temp->process;
-    stack->top = stack->top->next;
-    free(temp);
-    return process;
-}
-
-void calculateWaitingTime(Queue* queue) {
-    int totalWaitingTime = 0;
-    Node* current = queue->front;
-    while (current != NULL) {
-        current->process.waitingTime = totalWaitingTime;
-        totalWaitingTime += current->process.burstTime;
-        current = current->next;
+    for (int i = 0; i < n; i++) {
+        if (temp[i] < head) left++;
+        if (temp[i] > head) right++;
     }
+
+    qsort(temp, n, sizeof(int), (int (*)(const void *, const void *))strcmp);
+
+    if (direction == 0) {
+        for (int i = left - 1; i >= 0; i--) {
+            distance = abs(temp[i] - cur_head);
+            seek_count += distance;
+            cur_head = temp[i];
+        }
+        seek_count += abs(head - 0);
+        cur_head = 0;
+        for (int i = left; i < n; i++) {
+            distance = abs(temp[i] - cur_head);
+            seek_count += distance;
+            cur_head = temp[i];
+        }
+    } else {
+        for (int i = left; i < n; i++) {
+            distance = abs(temp[i] - cur_head);
+            seek_count += distance;
+            cur_head = temp[i];
+        }
+        seek_count += abs(head - 100);
+        cur_head = 100;
+        for (int i = left - 1; i >= 0; i--) {
+            distance = abs(temp[i] - cur_head);
+            seek_count += distance;
+            cur_head = temp[i];
+        }
+    }
+
+    printf("\nC-SCAN Disk Scheduling\nTotal seek operations = %d\n", seek_count);
 }
 
-void displayProcesses(Queue* queue) {
-    Node* current = queue->front;
-    while (current != NULL) {
-        printf("Process ID: %d, Burst Time: %d, Waiting Time: %d\n", current->process.id, current->process.burstTime, current->process.waitingTime);
-        current = current->next;
+int main() {
+    int arr[] = {176, 79, 34, 60, 92, 11, 41, 114};
+    int n = sizeof(arr) / sizeof(arr[0]);
+    int head = 50;
+
+    fcfs(arr, n, head);
+    scan(arr, n, head, 0);
+    cscan(arr, n, head, 0);
+
+    return 0;
+}
+
+
+
+------------To implement sequential file allocation method----------------------
+
+
+#include <stdio.h>
+
+void sequentialAllocation(int blockSize[], int n, int fileSize[], int m) {
+    int allocation[m];
+    for (int i = 0; i < m; i++) {
+        allocation[i] = -1;
+    }
+
+    int blockIndex = 0;
+    for (int i = 0; i < m; i++) {
+        for (int j = blockIndex; j < n; j++) {
+            if (blockSize[j] >= fileSize[i]) {
+                allocation[i] = j;
+                blockSize[j] -= fileSize[i];
+                blockIndex = j + 1;
+                break;
+            }
+        }
+    }
+
+    printf("\nSequential File Allocation\nFile No.\tFile Size\tBlock No.\n");
+    for (int i = 0; i < m; i++) {
+        printf("%d\t\t%d\t\t", i + 1, fileSize[i]);
+        if (allocation[i] != -1)
+            printf("%d\n", allocation[i] + 1);
+        else
+            printf("Not Allocated\n");
     }
 }
 
 int main() {
-    Process processes[] = {
-        {1, 5, 0},
-        {2, 3, 0},
-        {3, 8, 0},
-        {4, 6, 0}
-    };
+    int blockSize[] = {100, 500, 200, 300, 600}; // available blocks
+    int fileSize[] = {212, 417, 112, 426};       // file sizes
+    int n = sizeof(blockSize) / sizeof(blockSize[0]);
+    int m = sizeof(fileSize) / sizeof(fileSize[0]);
 
-    Queue* queue = createQueue();
-    for (int i = 0; i < 4; i++) {
-        enqueue(queue, processes[i]);
-    }
+    sequentialAllocation(blockSize, n, fileSize, m);
 
-    calculateWaitingTime(queue);
-    displayProcesses(queue);
-
-    Stack* stack = createStack();
-    while (!isEmptyQueue(queue)) {
-        push(stack, dequeue(queue));
-    }
-
-    printf("\nProcesses in stack (LIFO order):\n");
-    while (!isEmptyStack(stack)) {
-        Process process = pop(stack);
-        printf("Process ID: %d, Burst Time: %d, Waiting Time: %d\n", process.id, process.burstTime, process.waitingTime);
-    }
-
-    free(queue);
-    free(stack);
     return 0;
 }
+
+
+--------------To implement indexed file allocation method-------------------
+
+#include <stdio.h>
+
+void indexedAllocation(int blockSize[], int n, int fileSize[], int m) {
+    int indexBlock[n], allocation[m];
+
+    for (int i = 0; i < m; i++) {
+        allocation[i] = -1;
+    }
+
+    for (int i = 0; i < n; i++) {
+        indexBlock[i] = -1;
+    }
+
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n; j++) {
+            if (indexBlock[j] == -1 && blockSize[j] >= fileSize[i]) {
+                indexBlock[j] = i;
+                allocation[i] = j;
+                break;
+            }
+        }
+    }
+
+    printf("\nIndexed File Allocation\nFile No.\tFile Size\tBlock No.\n");
+    for (int i = 0; i < m; i++) {
+        printf("%d\t\t%d\t\t", i + 1, fileSize[i]);
+        if (allocation[i] != -1)
+            printf("%d\n", allocation[i] + 1);
+        else
+            printf("Not Allocated\n");
+    }
+}
+
+int main() {
+    int blockSize[] = {100, 500, 200, 300, 600};
+    int fileSize[] = {212, 417, 112, 426};
+    int n = sizeof(blockSize) / sizeof(blockSize[0]);
+    int m = sizeof(fileSize) / sizeof(fileSize[0]);
+
+    indexedAllocation(blockSize, n, fileSize, m);
+
+    return 0;
+}
+
+
+
+
